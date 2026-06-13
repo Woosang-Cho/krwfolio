@@ -224,7 +224,7 @@ def run_backtest_html(
             "gross_rebalance_effect",
             "implementation_cost_drag",
             "rebalance_trading_cost_drag",
-            "rebalanced_vs_buy_hold_effect",
+            "net_rebalance_policy_effect",
         ]
         if label in result.metrics
     )
@@ -233,7 +233,11 @@ def run_backtest_html(
         if include_rebalance_attribution
         else "<p class='note'>리밸런싱 vs buy-and-hold 비교는 빠른 실행을 위해 생략했습니다. 폼에서 추가 계산을 켜면 표시됩니다.</p>"
     )
-    cumulative = result.attribution["cumulative"].rename(
+    cumulative_raw = result.attribution["cumulative"]
+    total_contribution = float(cumulative_raw.iloc[0].get("total_contribution", float("nan")))
+    total_return = float(result.metrics.get("total_return", float("nan")))
+    reconciliation_diff = abs(total_contribution - total_return)
+    cumulative = cumulative_raw.rename(
         columns={
             "local_contribution": "Local",
             "fx_contribution": "FX",
@@ -278,7 +282,8 @@ def run_backtest_html(
       <div class="metric-grid compact">{rebalance_cards}</div>
       <div class="panel-row">
         <section class="subpanel">
-          <h3>Cumulative Attribution</h3>
+          <h3>누적 PnL 기여도</h3>
+          <p class="reconcile-note">sum(daily total_pnl) / initial value = final NAV / initial value - 1. 차이: {reconciliation_diff:.2e}</p>
           {frame_to_html(cumulative)}
         </section>
         <section class="subpanel">
@@ -334,6 +339,7 @@ METRIC_LABELS = {
     "gross_rebalance_effect": "Rebalanced vs Buy-Hold, Before Costs",
     "implementation_cost_drag": "Initial Cost Drag",
     "rebalance_trading_cost_drag": "Rebalance Trading Cost Drag",
+    "net_rebalance_policy_effect": "Rebalance Policy Effect vs Buy-Hold",
     "rebalanced_vs_buy_hold_effect": "Rebalanced vs Buy-Hold, After Rebalance Costs",
 }
 
@@ -855,6 +861,21 @@ def render_page(
       font-size: 12px;
       margin-top: -4px;
     }}
+    .source-warning, .reconcile-note {{
+      margin: 0 0 14px;
+      border: 1px solid #f0d58c;
+      border-radius: 8px;
+      background: #fff9e8;
+      color: #694c00;
+      padding: 10px 12px;
+      font-size: 13px;
+    }}
+    .reconcile-note {{
+      margin-top: -4px;
+      background: #fbfcfe;
+      border-color: var(--line);
+      color: var(--muted);
+    }}
     .csv-example {{
       margin: 10px 0 14px;
       border: 1px solid var(--line);
@@ -1099,13 +1120,14 @@ def render_page(
       <fieldset class="source-picker" aria-label="Data source">
         <label class="source-option">
           <input type="radio" name="data_source" value="yfinance" {yfinance_checked}>
-          <strong>yfinance에서 가져오기<span>티커와 기간만 넣고 빠르게 확인합니다. 기본 추천입니다.</span></strong>
+          <strong>yfinance에서 가져오기<span>빠른 체험용입니다. 재현성과 데이터 정확성을 보장하지 않습니다.</span></strong>
         </label>
         <label class="source-option" data-source-option="csv">
           <input type="radio" name="data_source" value="csv" {csv_checked}>
-          <strong>CSV 직접 입력<span>보관해 둔 가격/환율 스냅샷으로 재현 가능한 분석을 할 때 씁니다.</span></strong>
+          <strong>CSV 직접 입력<span>분석, 공유, 테스트에 권장되는 재현 가능한 입력입니다.</span></strong>
         </label>
       </fieldset>
+      <p class="source-warning">yfinance 결과는 나중에 달라질 수 있습니다. 중요한 분석은 가격/환율 CSV snapshot을 저장한 뒤 CSV 입력으로 다시 실행하세요.</p>
       <section class="simple-panel" id="simple-panel">
         <div class="grid input-grid">
           <div>

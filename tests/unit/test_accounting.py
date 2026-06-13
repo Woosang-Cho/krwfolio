@@ -44,6 +44,44 @@ def test_cumulative_pnl_contribution_equals_final_total_return():
     assert round(parts, 10) == round(result.metrics["total_return"], 10)
 
 
+def test_ledger_reconciles_nav_attribution_and_costs():
+    assets = [Asset("KR", "KR", "KRW"), Asset("US", "US", "USD")]
+    spec = PortfolioSpec(
+        "KRW",
+        1_000_000,
+        {"KR": 0.4, "US": 0.6},
+        rebalance="monthly",
+        transaction_cost_bps=5,
+    )
+    dates = pd.to_datetime(["2024-01-31", "2024-02-29", "2024-03-29"])
+    data = MarketData(
+        prices=pd.DataFrame({"KR": [100.0, 110.0, 105.0], "US": [100.0, 95.0, 108.0]}, index=dates),
+        fx=pd.DataFrame({"USD": [1300.0, 1320.0, 1280.0], "KRW": [1.0, 1.0, 1.0]}, index=dates),
+    )
+
+    result = BacktestEngine().run(assets, spec, data)
+    equity = result.equity_curve
+    daily = result.attribution["daily"]
+
+    total_return_from_nav = equity["nav"].iloc[-1] / spec.initial_value - 1.0
+    total_return_from_attr = daily["total_pnl"].sum() / spec.initial_value
+    assert total_return_from_nav == pytest.approx(total_return_from_attr)
+    assert result.attribution["cumulative"].iloc[0]["total_contribution"] == pytest.approx(
+        total_return_from_nav
+    )
+    asset_parts = daily["local_pnl"] + daily["fx_pnl"] + daily["cross_pnl"]
+    total_parts = daily["asset_pnl"] + daily["cash_pnl"] + daily["cost_pnl"]
+    assert (daily["asset_pnl"] - asset_parts).abs().max() < 1e-9
+    assert (daily["total_pnl"] - total_parts).abs().max() < 1e-9
+    assert equity["transaction_cost"].sum() == pytest.approx(-daily["cost_pnl"].sum())
+    previous_nav = pd.Series(
+        [spec.initial_value, *equity["nav"].iloc[:-1].tolist()],
+        index=equity.index,
+    )
+    assert (daily["portfolio_contribution"] - equity["daily_return"]).abs().max() < 1e-12
+    assert (daily["total_pnl"] / previous_nav - equity["daily_return"]).abs().max() < 1e-12
+
+
 def test_initial_cost_is_kept_out_of_risk_daily_return():
     assets = [Asset("A", "A", "KRW")]
     dates = pd.to_datetime(["2024-01-02", "2024-01-03"])
@@ -226,6 +264,36 @@ assets:
     currency: KRW
 """,
             "Missing required YAML field: asset.weight",
+        ),
+        (
+            """
+base_currency: KRW
+initial_value: 1000000
+start: 2024-01-01
+end: 2024-01-02
+fx:
+  USD: KRW=X
+assets:
+  - symbol: A
+    currency: KRW
+    weight: 1.0
+""",
+            "Unknown YAML keys: \\['fx'\\]",
+        ),
+        (
+            """
+base_currency: KRW
+initial_value: 1000000
+start: 2024-01-01
+end: 2024-01-02
+calendar:
+  max_staleness_days: -1
+assets:
+  - symbol: A
+    currency: KRW
+    weight: 1.0
+""",
+            "calendar.max_staleness_days must be non-negative",
         ),
     ],
 )

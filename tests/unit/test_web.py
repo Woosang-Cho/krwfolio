@@ -21,7 +21,8 @@ def test_web_backtest_renders_results():
     assert "결과" in html
     assert "Total Return" in html
     assert "성과 분해" in html
-    assert "Cumulative Attribution" in html
+    assert "누적 PnL 기여도" in html
+    assert "sum(daily total_pnl)" in html
     assert "원화 기준 NAV" in html
 
 
@@ -36,6 +37,7 @@ def test_web_initial_page_does_not_render_results():
     assert "asset-card" in html
     assert "자산 추가" in html
     assert "ticker-suggestions" in html
+    assert "yfinance 결과는 나중에 달라질 수 있습니다" in html
     assert 'name="start_year"' in html
     assert 'name="end_year"' in html
     assert 'name="start_date"' in html

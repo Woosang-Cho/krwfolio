@@ -68,6 +68,7 @@ def test_rebalance_none_has_zero_net_rebalance_effect_with_initial_cost():
 
     assert rebalance["gross_rebalance_effect"] == pytest.approx(0.0)
     assert rebalance["rebalance_trading_cost_drag"] == pytest.approx(0.0)
+    assert rebalance["net_rebalance_policy_effect"] == pytest.approx(0.0)
     assert rebalance["rebalanced_vs_buy_hold_effect"] == pytest.approx(0.0)
     assert rebalance["net_rebalance_effect"] == pytest.approx(0.0)
     assert rebalance["implementation_cost_drag"] < 0

@@ -680,6 +680,7 @@ class BacktestEngine:
                     "rebalance_trading_cost_drag": rebalance_trading_cost_drag,
                     "transaction_cost_drag": total_cost_drag,
                     "total_transaction_cost_drag": total_cost_drag,
+                    "net_rebalance_policy_effect": gross + rebalance_trading_cost_drag,
                     "rebalanced_vs_buy_hold_effect": gross + rebalance_trading_cost_drag,
                     "net_rebalance_effect": gross + rebalance_trading_cost_drag,
                 }

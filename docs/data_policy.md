@@ -7,6 +7,16 @@ The optional `YFinanceProvider` is an example provider for research and educatio
 should not be described as an official, verified, or reproducibility-guaranteed data
 source.
 
+Provider responsibilities are intentionally narrow:
+
+- load raw price and FX data into DataFrames
+- preserve source metadata and warnings
+- keep ticker and column names visible to the engine
+
+The engine owns calendar alignment, forward-fill, staleness checks, execution masks,
+and accounting validation. CSV snapshots are the reproducible input format; yfinance is
+only a convenience source for quick local exploration.
+
 Common risks:
 
 - USD/KRW quote direction can be inverted by mistake.

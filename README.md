@@ -191,7 +191,7 @@ result.json
 - `weights.csv`: 날짜별 자산 비중
 - `trades.csv`: 초기 매수와 리밸런싱 거래 내역
 - `attribution_daily.csv`: 날짜별 local, FX, cross, cost 기여도
-- `attribution_cumulative.csv`: 전체 기간 누적 성과 분해
+- `attribution_cumulative.csv`: 초기자본 대비 전체 기간 PnL 기여도. 최종 total return과 합산 검산됩니다.
 - `attribution_rebalance.csv`: 리밸런싱 포트폴리오와 buy-and-hold 비교
 - `result.json`: 지표, 진단 정보, 성과 분해를 모은 JSON
 

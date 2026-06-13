@@ -42,7 +42,7 @@ implementation_cost_drag =
 rebalance_trading_cost_drag =
   return(rebalanced, with all costs) - return(rebalanced, with initial cost only)
 
-rebalanced_vs_buy_hold_effect = gross_rebalance_effect + rebalance_trading_cost_drag
+net_rebalance_policy_effect = gross_rebalance_effect + rebalance_trading_cost_drag
 ```
 
 `implementation_cost_drag` is the initial portfolio construction cost. It is not counted

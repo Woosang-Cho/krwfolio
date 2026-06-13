@@ -28,5 +28,3 @@ assets:
     currency: USD
     asset_class: US Bond
     weight: 0.2
-fx:
-  USD: KRW=X

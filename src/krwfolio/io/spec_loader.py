@@ -32,7 +32,6 @@ def parse_run_config(raw: dict[str, Any], base_dir: Path | None = None) -> RunCo
         "calendar",
         "data",
         "assets",
-        "fx",
     }
     unknown = sorted(set(raw) - allowed)
     if unknown:
@@ -78,6 +77,9 @@ def parse_run_config(raw: dict[str, Any], base_dir: Path | None = None) -> RunCo
         rebalance.get("include_terminal_rebalance", False),
         "rebalance.include_terminal_rebalance",
     )
+    max_staleness_days = _int(calendar.get("max_staleness_days", 7), "calendar.max_staleness_days")
+    if max_staleness_days < 0:
+        raise ValidationError("calendar.max_staleness_days must be non-negative.")
     spec = PortfolioSpec(
         base_currency=raw.get("base_currency", "KRW"),
         initial_value=_float(_required(raw, "initial_value"), "initial_value"),
@@ -95,7 +97,7 @@ def parse_run_config(raw: dict[str, Any], base_dir: Path | None = None) -> RunCo
         price_csv=_resolve_path(data.get("prices"), base_dir),
         fx_csv=_resolve_path(data.get("fx"), base_dir),
         calendar_policy=calendar.get("policy", "union_ffill"),
-        max_staleness_days=_int(calendar.get("max_staleness_days", 7), "calendar.max_staleness_days"),
+        max_staleness_days=max_staleness_days,
         rebalance_timing=timing,
         include_terminal_rebalance=include_terminal_rebalance,
     )

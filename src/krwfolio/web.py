@@ -764,7 +764,9 @@ def render_page(
     .assets-head h3 {{ margin: 0; }}
     .asset-list {{
       display: grid;
-      gap: 10px;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+      align-items: start;
     }}
     .asset-card {{
       border: 1px solid var(--line);
@@ -1077,7 +1079,7 @@ def render_page(
     th:first-child, td:first-child {{ text-align: left; }}
     @media (max-width: 900px) {{
       header, main {{ padding-left: 16px; padding-right: 16px; }}
-      .two, .editor-grid, .csv-grid, .panel-row, .source-picker, .input-grid, .asset-card-top, .asset-fields {{ grid-template-columns: 1fr; }}
+      .two, .editor-grid, .csv-grid, .panel-row, .source-picker, .input-grid, .asset-list, .asset-card-top, .asset-fields {{ grid-template-columns: 1fr; }}
       .asset-index {{ justify-content: flex-start; min-height: auto; padding: 7px 9px; }}
       #yaml {{ min-height: 280px; }}
     }}

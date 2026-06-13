@@ -511,10 +511,10 @@ def simple_fields_from_form(form: dict[str, list[str]]) -> dict[str, object]:
 
 def date_from_form(form: dict[str, list[str]], field: str, default: str) -> str:
     year = form.get(f"{field}_year", [""])[0].strip()
-    month = form.get(f"{field}_month", [""])[0].strip()
-    day = form.get(f"{field}_day", [""])[0].strip()
-    if year and month and day:
-        return f"{int(year):04d}-{int(month):02d}-{int(day):02d}"
+    date_value = form.get(f"{field}_date", [""])[0].strip()
+    if year and date_value:
+        _, month, day = date_parts(date_value)
+        return f"{int(year):04d}-{month:02d}-{day:02d}"
     return form.get(field, [default])[0]
 
 
@@ -684,8 +684,6 @@ def render_page(
     yfinance_checked = "checked" if data_source == "yfinance" else ""
     rebalance_attribution_checked = "checked" if include_rebalance_attribution else ""
     simple_assets_html = simple_asset_rows(simple_fields)
-    _, _, start_day = date_parts(str(simple_fields["start"]))
-    _, _, end_day = date_parts(str(simple_fields["end"]))
     return f"""<!doctype html>
 <html lang="ko">
 <head>
@@ -749,16 +747,12 @@ def render_page(
     }}
     .date-controls {{
       display: grid;
-      grid-template-columns: minmax(84px, 1fr) 70px 58px;
+      grid-template-columns: minmax(86px, 0.7fr) minmax(150px, 1.3fr);
       gap: 6px;
     }}
     .date-controls input,
     .date-controls select {{
       min-width: 0;
-    }}
-    .date-controls input {{
-      text-align: center;
-      font-weight: 700;
     }}
     .assets-head {{
       display: flex;
@@ -1123,10 +1117,7 @@ def render_page(
               <select name="start_year" aria-label="시작 연도" data-date-part="year">
                 {year_options(str(simple_fields["start"]))}
               </select>
-              <select name="start_month" aria-label="시작 월" data-date-part="month">
-                {month_options(str(simple_fields["start"]))}
-              </select>
-              <input name="start_day" aria-label="시작 일" value="{start_day:02d}" inputmode="numeric" maxlength="2" data-date-part="day">
+              <input name="start_date" aria-label="시작 월일" type="date" value="{escape(str(simple_fields["start"]))}" data-date-part="date">
             </div>
           </div>
           <div class="date-field">
@@ -1136,10 +1127,7 @@ def render_page(
               <select name="end_year" aria-label="종료 연도" data-date-part="year">
                 {year_options(str(simple_fields["end"]))}
               </select>
-              <select name="end_month" aria-label="종료 월" data-date-part="month">
-                {month_options(str(simple_fields["end"]))}
-              </select>
-              <input name="end_day" aria-label="종료 일" value="{end_day:02d}" inputmode="numeric" maxlength="2" data-date-part="day">
+              <input name="end_date" aria-label="종료 월일" type="date" value="{escape(str(simple_fields["end"]))}" data-date-part="date">
             </div>
           </div>
           <div>
@@ -1244,19 +1232,21 @@ date,USD
       addAssetButton.textContent = hiddenCards.length === 0 ? "자산 슬롯 없음" : "자산 추가";
     }}
 
-    function daysInMonth(year, month) {{
-      return new Date(year, month, 0).getDate();
-    }}
-
-    function syncDateGroup(group) {{
+    function syncDateGroup(group, changedControl = null) {{
       const field = group.dataset.dateGroup;
-      const year = group.querySelector("[data-date-part='year']").value;
-      const month = group.querySelector("[data-date-part='month']").value;
-      const dayInput = group.querySelector("[data-date-part='day']");
-      const maxDay = daysInMonth(Number(year), Number(month));
-      const day = Math.min(Math.max(Number(dayInput.value || 1), 1), maxDay);
-      dayInput.value = String(day).padStart(2, "0");
-      document.querySelector(`#${{field}}`).value = `${{year}}-${{String(month).padStart(2, "0")}}-${{String(day).padStart(2, "0")}}`;
+      const yearSelect = group.querySelector("[data-date-part='year']");
+      const dateInput = group.querySelector("[data-date-part='date']");
+      if (!dateInput.value) return;
+      const parts = dateInput.value.split("-");
+      if (parts.length !== 3) return;
+      if (changedControl === dateInput && yearSelect.value !== parts[0]) {{
+        yearSelect.value = parts[0];
+      }}
+      if (changedControl === yearSelect && parts[0] !== yearSelect.value) {{
+        parts[0] = yearSelect.value;
+        dateInput.value = parts.join("-");
+      }}
+      document.querySelector(`#${{field}}`).value = `${{yearSelect.value}}-${{parts[1]}}-${{parts[2]}}`;
     }}
 
     initialValue.addEventListener("input", () => {{
@@ -1274,8 +1264,8 @@ date,USD
     }});
     dateGroups.forEach((group) => {{
       group.querySelectorAll("select, input").forEach((control) => {{
-        control.addEventListener("change", () => syncDateGroup(group));
-        control.addEventListener("input", () => syncDateGroup(group));
+        control.addEventListener("change", () => syncDateGroup(group, control));
+        control.addEventListener("input", () => syncDateGroup(group, control));
       }});
       syncDateGroup(group);
     }});

@@ -38,6 +38,8 @@ def test_web_initial_page_does_not_render_results():
     assert "ticker-suggestions" in html
     assert 'name="start_year"' in html
     assert 'name="end_year"' in html
+    assert 'name="start_date"' in html
+    assert 'name="end_date"' in html
 
 
 def test_simple_fields_to_yaml_accepts_comma_initial_value():
@@ -65,11 +67,9 @@ def test_simple_fields_from_form_builds_dates_from_parts():
         {
             "initial_value": ["10,000,000"],
             "start_year": ["2020"],
-            "start_month": ["1"],
-            "start_day": ["2"],
+            "start_date": ["2025-01-02"],
             "end_year": ["2024"],
-            "end_month": ["12"],
-            "end_day": ["31"],
+            "end_date": ["2026-12-31"],
             "symbol": ["SPY"],
             "currency": ["USD"],
             "weight": ["100"],

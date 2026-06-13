@@ -1,0 +1,55 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "krwfolio"
+version = "0.1.0"
+description = "KRW base-currency accounting and performance attribution for multi-currency portfolios."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "krwfolio contributors" }]
+keywords = ["portfolio", "accounting", "krw", "fx", "attribution"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Financial and Insurance Industry",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Topic :: Office/Business :: Financial :: Investment",
+]
+dependencies = [
+  "pandas>=2.2",
+  "numpy>=1.26",
+  "PyYAML>=6.0",
+]
+
+[project.optional-dependencies]
+yfinance = ["yfinance>=0.2"]
+dev = [
+  "pytest>=8.0",
+  "ruff>=0.6",
+]
+
+[project.scripts]
+krwfolio = "krwfolio.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/Woosang-Cho/krwfolio"
+Repository = "https://github.com/Woosang-Cho/krwfolio"
+Issues = "https://github.com/Woosang-Cho/krwfolio/issues"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+markers = [
+  "integration: tests that need external services or mutable market data",
+]
+
+[tool.ruff]
+line-length = 100
+src = ["src", "tests"]

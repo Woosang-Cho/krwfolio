@@ -14,6 +14,7 @@ Common risks:
 - Union calendar plus forward fill creates stale prices; the engine fails when
   staleness exceeds `max_staleness_days`.
 - Rebalancing on stale prices can create impossible trades; scheduled rebalances are
-  selected from dates where all target asset prices and required FX rates are observed.
+  mapped to the first later date where all target asset prices and required FX rates are
+  observed.
 - FX and equity closes happen in different time zones.
 - Current ETF universes can introduce survivorship bias when used for past periods.

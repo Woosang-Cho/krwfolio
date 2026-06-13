@@ -37,12 +37,12 @@ def test_yfinance_provider_batches_downloads_and_sets_timeout(monkeypatch):
     assert data.prices.loc[pd.Timestamp("2024-01-03"), "SPY"] == 101.0
     assert data.fx.loc[pd.Timestamp("2024-01-03"), "USD"] == 1310.0
     assert len(calls) == 2
-    assert all(call["threads"] is True for call in calls)
+    assert all(call["threads"] is False for call in calls)
     assert all(call["timeout"] == 10 for call in calls)
     assert calls[0]["end"] == "2024-01-04"
     assert data.metadata["provider"] == "yfinance"
     assert data.metadata["auto_adjust"] is True
-    assert data.metadata["threads"] is True
+    assert data.metadata["threads"] is False
 
 
 def test_yfinance_provider_rejects_missing_price_ticker(monkeypatch):

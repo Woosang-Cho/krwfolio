@@ -46,13 +46,17 @@ class BacktestEngine:
         target_weight_values = target_weights.to_numpy(dtype=float)
         execution_index = prepared.execution_mask.index[prepared.execution_mask]
         first_execution_date = execution_index[0]
-        candidate_rebal_dates = rebalance_dates(
-            execution_index,
+        scheduled_rebal_dates = rebalance_dates(
+            prices.index,
             spec.rebalance,
             include_terminal_rebalance=self.include_terminal_rebalance,
         ) - {first_execution_date}
-        rebal_dates = candidate_rebal_dates
-        skipped_rebal_dates: set[pd.Timestamp] = set()
+        mapped_rebal_dates, skipped_rebal_dates = self._map_rebalance_dates(
+            scheduled_rebal_dates,
+            execution_index,
+            prices.index[-1],
+        )
+        rebal_dates = mapped_rebal_dates
         executed_rebal_dates: set[pd.Timestamp] = set()
 
         dates = prices.index
@@ -104,6 +108,7 @@ class BacktestEngine:
                 fx_pnl = np.zeros(len(symbols), dtype=float)
                 cross_pnl = np.zeros(len(symbols), dtype=float)
                 portfolio_return = (nav_after_trade / spec.initial_value) - 1.0
+                risk_portfolio_return = 0.0
             else:
                 asset_pnl = before_values - previous_values
                 local_pnl = previous_values * local_return_values[position]
@@ -137,6 +142,7 @@ class BacktestEngine:
                     nav_after_trade = nav_before_trade
                     after_values = before_values
                 portfolio_return = (nav_after_trade / previous_nav) - 1.0
+                risk_portfolio_return = portfolio_return
 
             cost_pnl = -float(total_cost)
             daily_attr_records.append(
@@ -170,6 +176,7 @@ class BacktestEngine:
                     "cash": cash,
                     "transaction_cost": float(total_cost),
                     "daily_return": float(portfolio_return),
+                    "risk_daily_return": float(risk_portfolio_return),
                 }
             )
             holdings_records.append(
@@ -194,7 +201,7 @@ class BacktestEngine:
         cumulative_attr = self._cumulative_attribution(daily_attr, spec.initial_value)
         metrics = compute_metrics(
             equity_curve["nav"],
-            equity_curve["daily_return"],
+            equity_curve["risk_daily_return"],
             trades,
             initial_value=spec.initial_value,
         )
@@ -211,7 +218,8 @@ class BacktestEngine:
 
         diagnostics = self._diagnostics(
             prepared,
-            candidate_rebal_dates,
+            scheduled_rebal_dates,
+            mapped_rebal_dates,
             executed_rebal_dates,
             skipped_rebal_dates,
         )
@@ -349,10 +357,35 @@ class BacktestEngine:
             return
         date = too_stale.any(axis=1).idxmax()
         columns = sorted(too_stale.columns[too_stale.loc[date]].tolist())
+        details = []
+        for column in columns:
+            stale_days = int(staleness.loc[date, column])
+            last_observed = date - pd.Timedelta(days=stale_days)
+            details.append(f"{column}: last_observed={last_observed.date()}, stale_days={stale_days}")
         raise DataError(
             f"{label} data is stale beyond max_staleness_days={self.max_staleness_days} "
-            f"on {date.date()}: {columns}"
+            f"on {date.date()}: {'; '.join(details)}"
         )
+
+    def _map_rebalance_dates(
+        self,
+        scheduled_dates: set[pd.Timestamp],
+        execution_index: pd.DatetimeIndex,
+        terminal_date: pd.Timestamp,
+    ) -> tuple[set[pd.Timestamp], set[pd.Timestamp]]:
+        mapped_dates: set[pd.Timestamp] = set()
+        skipped_dates: set[pd.Timestamp] = set()
+        for scheduled_date in sorted(scheduled_dates):
+            position = execution_index.searchsorted(scheduled_date)
+            if position >= len(execution_index):
+                skipped_dates.add(scheduled_date)
+                continue
+            mapped_date = pd.Timestamp(execution_index[position])
+            if not self.include_terminal_rebalance and mapped_date == terminal_date:
+                skipped_dates.add(scheduled_date)
+                continue
+            mapped_dates.add(mapped_date)
+        return mapped_dates, skipped_dates
 
     def _cost_bps_for_trade(self, bps: float, trade_type: str, cost_mode: str) -> float:
         if cost_mode == "none":
@@ -647,6 +680,7 @@ class BacktestEngine:
                     "rebalance_trading_cost_drag": rebalance_trading_cost_drag,
                     "transaction_cost_drag": total_cost_drag,
                     "total_transaction_cost_drag": total_cost_drag,
+                    "rebalanced_vs_buy_hold_effect": gross + rebalance_trading_cost_drag,
                     "net_rebalance_effect": gross + rebalance_trading_cost_drag,
                 }
             ]
@@ -656,6 +690,7 @@ class BacktestEngine:
         self,
         prepared: "PreparedMarketData",
         scheduled_rebal_dates: set[pd.Timestamp],
+        mapped_rebal_dates: set[pd.Timestamp],
         executed_rebal_dates: set[pd.Timestamp],
         skipped_rebal_dates: set[pd.Timestamp],
     ) -> dict[str, object]:
@@ -677,12 +712,25 @@ class BacktestEngine:
                 prepared.execution_mask
             ][0].strftime("%Y-%m-%d"),
             "valuation_dates": len(prepared.prices.index),
+            "risk_return_note": (
+                "risk_daily_return sets the initial implementation-cost day to 0.0 so volatility "
+                "and Sharpe are not driven by initial deployment cost."
+            ),
+            "scheduled_rebalance_dates": [
+                date.strftime("%Y-%m-%d") for date in sorted(scheduled_rebal_dates)
+            ],
+            "mapped_rebalance_dates": [
+                date.strftime("%Y-%m-%d") for date in sorted(mapped_rebal_dates)
+            ],
             "scheduled_rebalance_candidates": [
                 date.strftime("%Y-%m-%d") for date in sorted(scheduled_rebal_dates)
             ],
             "rebalance_dates": [date.strftime("%Y-%m-%d") for date in sorted(executed_rebal_dates)],
             "executed_rebalance_dates": [
                 date.strftime("%Y-%m-%d") for date in sorted(executed_rebal_dates)
+            ],
+            "skipped_rebalance_dates": [
+                date.strftime("%Y-%m-%d") for date in sorted(skipped_rebal_dates)
             ],
             "skipped_rebalance_dates_due_to_stale_prices": [
                 date.strftime("%Y-%m-%d") for date in sorted(skipped_rebal_dates)
@@ -691,9 +739,8 @@ class BacktestEngine:
             "market_data_metadata": prepared.metadata,
             "provider_warnings": self._provider_warnings(prepared.metadata),
             "rebalance_calendar_note": (
-                "scheduled_rebalance_candidates are derived from the execution calendar. "
-                "Dates without observed prices and FX for all assets are not treated as executable "
-                "candidates in this MVP."
+                "scheduled_rebalance_dates are derived from the valuation calendar. "
+                "mapped_rebalance_dates are the first later dates with observed prices and FX for all assets."
             ),
             "price_source_note": "Use adjusted close consistently; do not add dividends again.",
             "fx_quote_note": "USD/KRW is KRW per 1 USD.",

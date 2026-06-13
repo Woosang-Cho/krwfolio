@@ -42,12 +42,12 @@ implementation_cost_drag =
 rebalance_trading_cost_drag =
   return(rebalanced, with all costs) - return(rebalanced, with initial cost only)
 
-net_rebalance_effect = gross_rebalance_effect + rebalance_trading_cost_drag
+rebalanced_vs_buy_hold_effect = gross_rebalance_effect + rebalance_trading_cost_drag
 ```
 
 `implementation_cost_drag` is the initial portfolio construction cost. It is not counted
-as rebalancing drag. This keeps `rebalance="none"` from reporting a negative net
-rebalancing effect just because the initial purchase had transaction cost.
+as rebalancing drag. This keeps `rebalance="none"` from reporting a negative
+rebalanced-vs-buy-and-hold effect just because the initial purchase had transaction cost.
 
 This should be described as rebalancing contribution versus buy-and-hold baseline, not
 as rebalancing alpha.

@@ -68,11 +68,35 @@ def test_rebalance_none_has_zero_net_rebalance_effect_with_initial_cost():
 
     assert rebalance["gross_rebalance_effect"] == pytest.approx(0.0)
     assert rebalance["rebalance_trading_cost_drag"] == pytest.approx(0.0)
+    assert rebalance["rebalanced_vs_buy_hold_effect"] == pytest.approx(0.0)
     assert rebalance["net_rebalance_effect"] == pytest.approx(0.0)
     assert rebalance["implementation_cost_drag"] < 0
 
 
-def test_rebalance_uses_execution_calendar_and_requires_fx_observed():
+def test_rebalance_maps_scheduled_date_to_next_execution_date():
+    assets = [Asset("KR", "KR", "KRW"), Asset("US", "US", "USD")]
+    dates = pd.to_datetime(["2024-01-31", "2024-02-29", "2024-03-01", "2024-03-04"])
+    data = MarketData(
+        prices=pd.DataFrame(
+            {"KR": [100.0, 110.0, 111.0, 112.0], "US": [100.0, 120.0, 121.0, 122.0]},
+            index=dates,
+        ),
+        fx=pd.DataFrame(
+            {"USD": [1300.0, None, 1310.0, 1311.0], "KRW": [1.0, 1.0, 1.0, 1.0]},
+            index=dates,
+        ),
+    )
+    spec = PortfolioSpec("KRW", 1_000_000, {"KR": 0.5, "US": 0.5}, rebalance="monthly")
+
+    result = BacktestEngine(max_staleness_days=40).run(assets, spec, data)
+
+    assert result.diagnostics["scheduled_rebalance_dates"] == ["2024-02-29"]
+    assert result.diagnostics["mapped_rebalance_dates"] == ["2024-03-01"]
+    assert result.diagnostics["executed_rebalance_dates"] == ["2024-03-01"]
+    assert "rebalance" in set(result.trades["trade_type"])
+
+
+def test_rebalance_records_skipped_scheduled_date_without_later_execution():
     assets = [Asset("KR", "KR", "KRW"), Asset("US", "US", "USD")]
     dates = pd.to_datetime(["2024-01-31", "2024-02-29", "2024-03-01"])
     data = MarketData(
@@ -81,7 +105,7 @@ def test_rebalance_uses_execution_calendar_and_requires_fx_observed():
             index=dates,
         ),
         fx=pd.DataFrame(
-            {"USD": [1300.0, None, 1310.0], "KRW": [1.0, 1.0, 1.0]},
+            {"USD": [1300.0, None, None], "KRW": [1.0, 1.0, 1.0]},
             index=dates,
         ),
     )
@@ -89,8 +113,9 @@ def test_rebalance_uses_execution_calendar_and_requires_fx_observed():
 
     result = BacktestEngine(max_staleness_days=40).run(assets, spec, data)
 
-    assert result.diagnostics["scheduled_rebalance_candidates"] == []
-    assert result.diagnostics["executed_rebalance_dates"] == []
+    assert result.diagnostics["scheduled_rebalance_dates"] == ["2024-02-29"]
+    assert result.diagnostics["mapped_rebalance_dates"] == []
+    assert result.diagnostics["skipped_rebalance_dates"] == ["2024-02-29"]
     assert set(result.trades["trade_type"]) == {"initial"}
 
 

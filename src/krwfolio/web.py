@@ -224,7 +224,7 @@ def run_backtest_html(
             "gross_rebalance_effect",
             "implementation_cost_drag",
             "rebalance_trading_cost_drag",
-            "net_rebalance_effect",
+            "rebalanced_vs_buy_hold_effect",
         ]
         if label in result.metrics
     )
@@ -287,6 +287,7 @@ def run_backtest_html(
             <div><dt>기간</dt><dd>{escape(diagnostics["effective_start"])} - {escape(diagnostics["effective_end"])}</dd></div>
             <div><dt>평가일</dt><dd>{diagnostics["valuation_dates"]}</dd></div>
             <div><dt>리밸런싱</dt><dd>{len(diagnostics["rebalance_dates"])}</dd></div>
+            <div><dt>스케줄 리밸런싱</dt><dd>{len(diagnostics.get("scheduled_rebalance_dates", []))}</dd></div>
             <div><dt>가격 staleness</dt><dd>{escape(str(diagnostics["max_price_staleness_by_symbol"]))}</dd></div>
           </dl>
         </section>
@@ -318,16 +319,30 @@ def equity_to_html(frame: pd.DataFrame) -> str:
         "cash": lambda value: f"{value:,.0f}",
         "transaction_cost": lambda value: f"{value:,.0f}",
         "daily_return": lambda value: f"{value:.4%}",
+        "risk_daily_return": lambda value: f"{value:.4%}",
         "drawdown": lambda value: f"{value:.4%}",
     }
     return frame.to_html(classes="data", border=0, formatters=formatters)
+
+
+METRIC_LABELS = {
+    "total_return": "Total Return",
+    "cagr": "CAGR",
+    "mdd": "MDD",
+    "volatility": "Volatility",
+    "sharpe": "Sharpe",
+    "gross_rebalance_effect": "Rebalanced vs Buy-Hold, Before Costs",
+    "implementation_cost_drag": "Initial Cost Drag",
+    "rebalance_trading_cost_drag": "Rebalance Trading Cost Drag",
+    "rebalanced_vs_buy_hold_effect": "Rebalanced vs Buy-Hold, After Rebalance Costs",
+}
 
 
 def metric_card(label: str, value: float) -> str:
     display = f"{value:.2f}" if label == "sharpe" else f"{value:.2%}"
     return f"""
     <div class="metric-card">
-      <span>{escape(label.replace("_", " ").title())}</span>
+      <span>{escape(METRIC_LABELS.get(label, label.replace("_", " ").title()))}</span>
       <strong>{escape(display)}</strong>
     </div>
     """

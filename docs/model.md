@@ -18,10 +18,10 @@ The MVP convention is:
 5. Deduct transaction costs before setting final target shares.
 6. Use the after-trade holdings as the next day's starting positions.
 
-Rebalancing dates are the last valuation date before a calendar period changes. The
-terminal valuation date is not rebalanced by default because there is no later holding
-period to benefit from the trade. Set `include_terminal_rebalance=true` explicitly if
-that behavior is desired.
+Scheduled rebalancing dates are the last valuation date before a calendar period
+changes. The terminal valuation date is not rebalanced by default because there is no
+later holding period to benefit from the trade. Set `include_terminal_rebalance=true`
+explicitly if that behavior is desired.
 
 Valuation uses a union calendar plus forward-fill, but stale data is bounded. Staleness
 is measured on the full union calendar before the effective start is trimmed, so a
@@ -31,8 +31,12 @@ column is forward-filled for more than `max_staleness_days`, the engine raises
 
 Initial and scheduled trades use an execution calendar. A date is executable only when
 every target asset price and every required FX rate are observed on that date. Scheduled
-rebalances are selected from the execution calendar, not from the broader valuation
-calendar.
+rebalances are mapped to the first later executable date. If no such date exists, the
+scheduled rebalance is recorded as skipped.
+
+`daily_return` in the equity curve reconciles to net NAV after costs. `risk_daily_return`
+sets the initial implementation-cost day to zero so volatility and Sharpe are not driven
+by the cost of putting the portfolio on.
 
 The MVP supports KRW as base currency and KRW/USD assets only. USD/KRW means KRW per
 1 USD. If USD/KRW rises from 1300 to 1430, USD appreciated against KRW by 10%.

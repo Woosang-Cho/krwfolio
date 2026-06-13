@@ -58,7 +58,7 @@ class YFinanceProvider:
                 "provider": "yfinance",
                 "downloaded_at": datetime.now(UTC).isoformat(),
                 "auto_adjust": True,
-                "threads": True,
+                "threads": False,
                 "timeout_seconds": self.timeout_seconds,
                 "asset_symbols": asset_symbols,
                 "fx_tickers": self.fx_tickers,
@@ -80,7 +80,7 @@ def download_history(
             end=end,
             auto_adjust=True,
             progress=False,
-            threads=True,
+            threads=False,
             timeout=timeout_seconds,
         )
     except Exception as exc:

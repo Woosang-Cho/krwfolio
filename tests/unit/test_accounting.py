@@ -44,6 +44,23 @@ def test_cumulative_pnl_contribution_equals_final_total_return():
     assert round(parts, 10) == round(result.metrics["total_return"], 10)
 
 
+def test_initial_cost_is_kept_out_of_risk_daily_return():
+    assets = [Asset("A", "A", "KRW")]
+    dates = pd.to_datetime(["2024-01-02", "2024-01-03"])
+    data = MarketData(
+        prices=pd.DataFrame({"A": [100.0, 100.0]}, index=dates),
+        fx=pd.DataFrame({"KRW": [1.0, 1.0]}, index=dates),
+    )
+    spec = PortfolioSpec("KRW", 1_000_000, {"A": 1.0}, transaction_cost_bps=10)
+
+    result = BacktestEngine().run(assets, spec, data)
+
+    assert result.equity_curve["daily_return"].iloc[0] == pytest.approx(-0.001)
+    assert result.equity_curve["risk_daily_return"].iloc[0] == pytest.approx(0.0)
+    assert result.metrics["total_return"] == pytest.approx(-0.001)
+    assert result.metrics["volatility"] == pytest.approx(0.0)
+
+
 def test_staleness_over_limit_raises_data_error():
     assets = [Asset("A", "A", "KRW")]
     price_dates = pd.to_datetime(["2024-01-01", "2024-01-10"])
@@ -54,7 +71,7 @@ def test_staleness_over_limit_raises_data_error():
     )
     spec = PortfolioSpec("KRW", 1_000_000, {"A": 1.0})
 
-    with pytest.raises(DataError, match="stale beyond max_staleness_days=3"):
+    with pytest.raises(DataError, match="last_observed=2024-01-01, stale_days=4"):
         BacktestEngine(max_staleness_days=3).run(assets, spec, data)
 
 

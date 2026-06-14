@@ -227,5 +227,6 @@ calendar와 forward-fill을 사용하지만, 오래된 데이터가 계속 이�
 ## 문서
 
 - [계산 모델](docs/model.md)
+- [계산 계약 v0.2](docs/calculation_contract.md)
 - [성과 기여도 모델](docs/attribution.md)
 - [데이터 정책](docs/data_policy.md)

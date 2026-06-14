@@ -20,6 +20,7 @@ def export_result(result: BacktestResult, out_dir: str | Path, formats: set[str]
             frame.to_csv(out / f"attribution_{name}.csv", index=name == "daily")
     if "json" in formats:
         payload = {
+            "schema_version": result.schema_version,
             "metrics": result.metrics,
             "diagnostics": result.diagnostics,
             "attribution": {

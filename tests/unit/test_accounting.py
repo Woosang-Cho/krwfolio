@@ -1,8 +1,11 @@
+import json
+
 import pandas as pd
 import pytest
 
 from krwfolio import Asset, BacktestEngine, MarketData, PortfolioSpec
 from krwfolio.exceptions import DataError, ValidationError
+from krwfolio.io.exporters import export_result
 from krwfolio.io.spec_loader import load_run_config_text
 
 
@@ -80,6 +83,60 @@ def test_ledger_reconciles_nav_attribution_and_costs():
     )
     assert (daily["portfolio_contribution"] - equity["daily_return"]).abs().max() < 1e-12
     assert (daily["total_pnl"] / previous_nav - equity["daily_return"]).abs().max() < 1e-12
+
+
+def test_result_schema_version_and_required_columns_are_stable():
+    assets = [Asset("A", "A", "KRW"), Asset("B", "B", "KRW")]
+    dates = pd.to_datetime(["2024-01-02", "2024-01-03"])
+    data = MarketData(
+        prices=pd.DataFrame({"A": [100.0, 101.0], "B": [100.0, 99.0]}, index=dates),
+        fx=pd.DataFrame({"KRW": [1.0, 1.0]}, index=dates),
+    )
+    spec = PortfolioSpec("KRW", 1_000_000, {"A": 0.5, "B": 0.5}, transaction_cost_bps=5)
+
+    result = BacktestEngine().run(assets, spec, data)
+
+    assert result.schema_version == "0.2"
+    assert {"nav", "cash", "transaction_cost", "daily_return", "risk_daily_return", "drawdown"} <= set(
+        result.equity_curve.columns
+    )
+    assert {"trade_type", "trade_value_base", "cost_base", "turnover_basis_base"} <= set(
+        result.trades.columns
+    )
+    assert {
+        "local_pnl",
+        "fx_pnl",
+        "cross_pnl",
+        "asset_pnl",
+        "cash_pnl",
+        "cost_pnl",
+        "total_pnl",
+        "portfolio_contribution",
+    } <= set(result.attribution["daily"].columns)
+    assert {"asset_contribution", "cash_contribution", "cost_contribution", "total_contribution"} <= set(
+        result.attribution["cumulative"].columns
+    )
+    assert {"total_return", "cagr", "mdd", "volatility", "sharpe"} <= set(result.metrics)
+    assert {"effective_start", "effective_end", "scheduled_rebalance_dates", "executed_rebalance_dates"} <= set(
+        result.diagnostics
+    )
+
+
+def test_json_export_includes_schema_version(tmp_path):
+    assets = [Asset("A", "A", "KRW")]
+    dates = pd.to_datetime(["2024-01-02", "2024-01-03"])
+    data = MarketData(
+        prices=pd.DataFrame({"A": [100.0, 101.0]}, index=dates),
+        fx=pd.DataFrame({"KRW": [1.0, 1.0]}, index=dates),
+    )
+    result = BacktestEngine().run(assets, PortfolioSpec("KRW", 1_000_000, {"A": 1.0}), data)
+
+    export_result(result, tmp_path, {"json"})
+
+    payload = json.loads((tmp_path / "result.json").read_text())
+    assert payload["schema_version"] == "0.2"
+    assert "metrics" in payload
+    assert "diagnostics" in payload
 
 
 def test_initial_cost_is_kept_out_of_risk_daily_return():

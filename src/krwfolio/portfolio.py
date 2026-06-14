@@ -51,3 +51,4 @@ class BacktestResult:
     attribution: dict[str, pd.DataFrame]
     metrics: dict[str, float]
     diagnostics: dict[str, object] = field(default_factory=dict)
+    schema_version: str = "0.2"

@@ -7,6 +7,7 @@ from krwfolio import Asset, BacktestEngine, MarketData, PortfolioSpec
 from krwfolio.exceptions import DataError, ValidationError
 from krwfolio.io.exporters import export_result
 from krwfolio.io.spec_loader import load_run_config_text
+from krwfolio.schema import RESULT_SCHEMA_VERSION
 
 
 def test_two_asset_offsetting_returns_produce_zero_portfolio_return():
@@ -96,7 +97,7 @@ def test_result_schema_version_and_required_columns_are_stable():
 
     result = BacktestEngine().run(assets, spec, data)
 
-    assert result.schema_version == "0.2"
+    assert result.schema_version == RESULT_SCHEMA_VERSION
     assert {"nav", "cash", "transaction_cost", "daily_return", "risk_daily_return", "drawdown"} <= set(
         result.equity_curve.columns
     )
@@ -134,9 +135,49 @@ def test_json_export_includes_schema_version(tmp_path):
     export_result(result, tmp_path, {"json"})
 
     payload = json.loads((tmp_path / "result.json").read_text())
-    assert payload["schema_version"] == "0.2"
+    assert payload["schema_version"] == RESULT_SCHEMA_VERSION
     assert "metrics" in payload
     assert "diagnostics" in payload
+
+
+def test_csv_export_bundle_uses_documented_files_and_columns(tmp_path):
+    assets = [Asset("A", "A", "KRW"), Asset("B", "B", "KRW")]
+    dates = pd.to_datetime(["2024-01-02", "2024-01-03"])
+    data = MarketData(
+        prices=pd.DataFrame({"A": [100.0, 101.0], "B": [100.0, 99.0]}, index=dates),
+        fx=pd.DataFrame({"KRW": [1.0, 1.0]}, index=dates),
+    )
+    result = BacktestEngine().run(
+        assets,
+        PortfolioSpec("KRW", 1_000_000, {"A": 0.5, "B": 0.5}, transaction_cost_bps=5),
+        data,
+    )
+
+    export_result(result, tmp_path, {"csv", "json"})
+
+    expected_files = {
+        "equity_curve.csv",
+        "holdings.csv",
+        "weights.csv",
+        "trades.csv",
+        "attribution_daily.csv",
+        "attribution_cumulative.csv",
+        "attribution_rebalance.csv",
+        "result.json",
+    }
+    assert {path.name for path in tmp_path.iterdir()} == expected_files
+    equity = pd.read_csv(tmp_path / "equity_curve.csv")
+    trades = pd.read_csv(tmp_path / "trades.csv")
+    cumulative = pd.read_csv(tmp_path / "attribution_cumulative.csv")
+    assert {"date", "nav", "cash", "transaction_cost", "daily_return", "risk_daily_return", "drawdown"} <= set(
+        equity.columns
+    )
+    assert {"date", "symbol", "trade_type", "cost_base", "turnover_basis_base"} <= set(
+        trades.columns
+    )
+    assert {"asset_contribution", "cash_contribution", "cost_contribution", "total_contribution"} <= set(
+        cumulative.columns
+    )
 
 
 def test_initial_cost_is_kept_out_of_risk_daily_return():

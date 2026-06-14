@@ -5,6 +5,7 @@ import pandas as pd
 
 from krwfolio.assets import Currency
 from krwfolio.exceptions import ValidationError
+from krwfolio.schema import RESULT_SCHEMA_VERSION
 
 RebalanceFrequency = Literal["none", "monthly", "quarterly", "yearly"]
 
@@ -51,4 +52,4 @@ class BacktestResult:
     attribution: dict[str, pd.DataFrame]
     metrics: dict[str, float]
     diagnostics: dict[str, object] = field(default_factory=dict)
-    schema_version: str = "0.2"
+    schema_version: str = RESULT_SCHEMA_VERSION

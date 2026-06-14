@@ -94,6 +94,14 @@ def test_rebalance_maps_scheduled_date_to_next_execution_date():
     assert result.diagnostics["scheduled_rebalance_dates"] == ["2024-02-29"]
     assert result.diagnostics["mapped_rebalance_dates"] == ["2024-03-01"]
     assert result.diagnostics["executed_rebalance_dates"] == ["2024-03-01"]
+    assert result.diagnostics["rebalance_mapping"] == [
+        {
+            "scheduled_date": "2024-02-29",
+            "mapped_date": "2024-03-01",
+            "status": "mapped",
+            "reason": "mapped_next_executable_date",
+        }
+    ]
     assert "rebalance" in set(result.trades["trade_type"])
 
 
@@ -117,6 +125,14 @@ def test_rebalance_records_skipped_scheduled_date_without_later_execution():
     assert result.diagnostics["scheduled_rebalance_dates"] == ["2024-02-29"]
     assert result.diagnostics["mapped_rebalance_dates"] == []
     assert result.diagnostics["skipped_rebalance_dates"] == ["2024-02-29"]
+    assert result.diagnostics["rebalance_mapping"] == [
+        {
+            "scheduled_date": "2024-02-29",
+            "mapped_date": None,
+            "status": "skipped",
+            "reason": "no_later_executable_date",
+        }
+    ]
     assert set(result.trades["trade_type"]) == {"initial"}
 
 

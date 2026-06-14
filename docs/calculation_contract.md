@@ -81,4 +81,14 @@ deployment cost does not look like market risk.
 
 `diagnostics` must include scheduled, mapped, executed, and skipped rebalance dates so
 users can see whether a policy date was delayed or skipped because no executable date
-was available.
+was available. It must also include `rebalance_mapping`, a row-oriented table with:
+
+- `scheduled_date`
+- `mapped_date`
+- `status`
+- `reason`
+
+`rebalance_mapping.reason` is the canonical skip/mapping explanation. Current reasons
+are `mapped_same_date`, `mapped_next_executable_date`, `terminal_rebalance_disabled`,
+and `no_later_executable_date`. Older list-style diagnostics may remain for
+compatibility, but new consumers should prefer the row-oriented mapping table.

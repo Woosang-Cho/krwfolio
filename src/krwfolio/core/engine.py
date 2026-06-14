@@ -9,7 +9,7 @@ from krwfolio.assets import Asset
 from krwfolio.analytics.metrics import compute_metrics
 from krwfolio.core.accounting import drawdown
 from krwfolio.core.fx import asset_fx_frame, base_returns, validate_asset_currencies
-from krwfolio.core.rebalancing import rebalance_dates
+from krwfolio.core.scheduling import RebalancePlan, build_rebalance_plan
 from krwfolio.exceptions import DataError, ValidationError
 from krwfolio.portfolio import BacktestResult, MarketData, PortfolioSpec
 
@@ -46,17 +46,14 @@ class BacktestEngine:
         target_weight_values = target_weights.to_numpy(dtype=float)
         execution_index = prepared.execution_mask.index[prepared.execution_mask]
         first_execution_date = execution_index[0]
-        scheduled_rebal_dates = rebalance_dates(
+        rebalance_plan = build_rebalance_plan(
             prices.index,
+            execution_index,
             spec.rebalance,
             include_terminal_rebalance=self.include_terminal_rebalance,
-        ) - {first_execution_date}
-        mapped_rebal_dates, skipped_rebal_dates = self._map_rebalance_dates(
-            scheduled_rebal_dates,
-            execution_index,
-            prices.index[-1],
+            first_execution_date=first_execution_date,
         )
-        rebal_dates = mapped_rebal_dates
+        rebal_dates = set(rebalance_plan.mapped_dates)
         executed_rebal_dates: set[pd.Timestamp] = set()
 
         dates = prices.index
@@ -218,10 +215,8 @@ class BacktestEngine:
 
         diagnostics = self._diagnostics(
             prepared,
-            scheduled_rebal_dates,
-            mapped_rebal_dates,
+            rebalance_plan,
             executed_rebal_dates,
-            skipped_rebal_dates,
         )
         return BacktestResult(
             equity_curve=equity_curve,
@@ -366,26 +361,6 @@ class BacktestEngine:
             f"{label} data is stale beyond max_staleness_days={self.max_staleness_days} "
             f"on {date.date()}: {'; '.join(details)}"
         )
-
-    def _map_rebalance_dates(
-        self,
-        scheduled_dates: set[pd.Timestamp],
-        execution_index: pd.DatetimeIndex,
-        terminal_date: pd.Timestamp,
-    ) -> tuple[set[pd.Timestamp], set[pd.Timestamp]]:
-        mapped_dates: set[pd.Timestamp] = set()
-        skipped_dates: set[pd.Timestamp] = set()
-        for scheduled_date in sorted(scheduled_dates):
-            position = execution_index.searchsorted(scheduled_date)
-            if position >= len(execution_index):
-                skipped_dates.add(scheduled_date)
-                continue
-            mapped_date = pd.Timestamp(execution_index[position])
-            if not self.include_terminal_rebalance and mapped_date == terminal_date:
-                skipped_dates.add(scheduled_date)
-                continue
-            mapped_dates.add(mapped_date)
-        return mapped_dates, skipped_dates
 
     def _cost_bps_for_trade(self, bps: float, trade_type: str, cost_mode: str) -> float:
         if cost_mode == "none":
@@ -690,10 +665,8 @@ class BacktestEngine:
     def _diagnostics(
         self,
         prepared: "PreparedMarketData",
-        scheduled_rebal_dates: set[pd.Timestamp],
-        mapped_rebal_dates: set[pd.Timestamp],
+        rebalance_plan: RebalancePlan,
         executed_rebal_dates: set[pd.Timestamp],
-        skipped_rebal_dates: set[pd.Timestamp],
     ) -> dict[str, object]:
         return {
             "calendar_policy": self.calendar_policy,
@@ -718,23 +691,29 @@ class BacktestEngine:
                 "and Sharpe are not driven by initial deployment cost."
             ),
             "scheduled_rebalance_dates": [
-                date.strftime("%Y-%m-%d") for date in sorted(scheduled_rebal_dates)
+                date.strftime("%Y-%m-%d") for date in rebalance_plan.scheduled_dates
             ],
             "mapped_rebalance_dates": [
-                date.strftime("%Y-%m-%d") for date in sorted(mapped_rebal_dates)
+                date.strftime("%Y-%m-%d") for date in rebalance_plan.mapped_dates
+            ],
+            "rebalance_mapping": [
+                mapping.to_diagnostic() for mapping in rebalance_plan.mappings
             ],
             "scheduled_rebalance_candidates": [
-                date.strftime("%Y-%m-%d") for date in sorted(scheduled_rebal_dates)
+                date.strftime("%Y-%m-%d") for date in rebalance_plan.scheduled_dates
             ],
             "rebalance_dates": [date.strftime("%Y-%m-%d") for date in sorted(executed_rebal_dates)],
             "executed_rebalance_dates": [
                 date.strftime("%Y-%m-%d") for date in sorted(executed_rebal_dates)
             ],
             "skipped_rebalance_dates": [
-                date.strftime("%Y-%m-%d") for date in sorted(skipped_rebal_dates)
+                date.strftime("%Y-%m-%d") for date in rebalance_plan.skipped_dates
             ],
+            # Deprecated compatibility field. Prefer rebalance_mapping.reason for skip causes.
             "skipped_rebalance_dates_due_to_stale_prices": [
-                date.strftime("%Y-%m-%d") for date in sorted(skipped_rebal_dates)
+                mapping.scheduled_date.strftime("%Y-%m-%d")
+                for mapping in rebalance_plan.mappings
+                if mapping.status == "skipped" and mapping.reason == "no_later_executable_date"
             ],
             "fx_warnings": prepared.fx_warnings,
             "market_data_metadata": prepared.metadata,
